@@ -3,13 +3,14 @@ package main
 import (
 	"database/sql"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/Zekeriyyah/my-portfolio/internal/models"
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 var db *sql.DB
@@ -26,26 +27,25 @@ func main() {
 		log.Fatal("Error loading .env file!")
 	}
 
-	userName := os.Getenv("MYSQL_USERNAME")
-	dbName := os.Getenv("MYSQL_DBNAME")
-	password := os.Getenv("MYSQL_PASSWORD")
-
 	addr := flag.String("addr", ":5005", "HTTP Network address")
-	dsn := flag.String("dsn", userName+":"+password+"@/"+dbName+"?parseTime=true", "Database data source name")
-
 	flag.Parse()
 
-	db, err = openDB(*dsn) // Connecting to mysql database
+	host := os.Getenv("PQSQL_HOST")
+	port := os.Getenv("PQSQL_PORT")
+	userName := os.Getenv("PQSQL_USERNAME")
+	dbName := os.Getenv("PQSQL_DBNAME")
+	password := os.Getenv("PQSQL_PASSWORD")
+
+	postgresInfo := fmt.Sprintf("host=%s port=%s username=%s passwordo=%s dbname=%s sslmode=disable",
+		host, port, userName, password, dbName)
+
+	db, err = openDB(postgresInfo) // Connecting to mysql database
 	if err != nil {
+		log.Println("Database connection failed!")
 		log.Fatal(err)
 	}
 
 	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	err = models.Initialize(db)
 	if err != nil {
@@ -61,17 +61,19 @@ func main() {
 	}
 
 	srv := &http.Server{
-		Addr:    *addr,
-		Handler: app.Route(),
+		Addr:     *addr,
+		ErrorLog: errorLog,
+		Handler:  app.Route(),
 	}
 
 	infoLog.Printf("Starting a server on port %s\n", *addr)
+	// err = srv.ListenAndServe()
 	err = srv.ListenAndServe()
 	errorLog.Fatal(err)
 }
 
 func openDB(dsn string) (*sql.DB, error) {
-	db, err := sql.Open("mysql", dsn)
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, err
 	}
