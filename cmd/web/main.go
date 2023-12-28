@@ -41,7 +41,8 @@ func main() {
 
 	db, err = openDB(postgresInfo) // Connecting to mysql database
 	if err != nil {
-		log.Println("Database connection failed!")
+		log.Printf("Database connection failed!\n%v", err)
+		return
 	}
 
 	defer db.Close()
